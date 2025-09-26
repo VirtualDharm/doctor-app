@@ -6,12 +6,12 @@ import { io } from 'socket.io-client';
 
 // --- CONFIG ---
 const APP_ID = '60bdf4f5f1b641f583d20d28d7a923d1';
-const SIGNALING_SERVER = 'https://server-w411.onrender.com'; // <-- REPLACE
+const SIGNALING_SERVER = 'https://server-w411.onrender.com';
 const MY_USER_ID = 'doctor';
 
 export default function App() {
   const socketRef = useRef(null);
-  const [incomingCall, setIncomingCall] = useState(null); // { from, channel, callerUid }
+  const [incomingCall, setIncomingCall] = useState(null);
   const [joined, setJoined] = useState(false);
   const [token, setToken] = useState(null);
   const [uid, setUid] = useState(null);
@@ -35,6 +35,12 @@ export default function App() {
       appendLog('caller rejected or canceled');
     });
 
+    // peer hung up
+    socket.on('end_call', () => {
+      appendLog('peer ended the call');
+      cleanupCall();
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -42,6 +48,14 @@ export default function App() {
 
   function appendLog(s) {
     setLog((l) => `${l}\n${s}`);
+  }
+
+  function cleanupCall() {
+    setJoined(false);
+    setChannel('');
+    setToken(null);
+    setUid(null);
+    setIncomingCall(null);
   }
 
   async function acceptCall() {
@@ -60,7 +74,6 @@ export default function App() {
       setUid(myUid);
       setChannel(channelName);
 
-      // let caller know we're joining
       socketRef.current.emit('accept_call', {
         to: incomingCall.from,
         from: MY_USER_ID,
@@ -86,18 +99,14 @@ export default function App() {
     return (
       <SafeAreaView style={{ flex: 1 }}>
         <AgoraUIKit
-          connectionData={{
-            appId: APP_ID,
-            channel: channel,
-            token: token || undefined,
-            uid: uid || undefined,
-          }}
-          callbacks={{ EndCall: () => {
-            setJoined(false);
-            setChannel('');
-            setToken(null);
-            setUid(null);
-          } }}
+            connectionData={{ appId: APP_ID, channel, token, uid }}
+            settings={{}}
+            rtcCallbacks={{
+                EndCall: () => {
+                    socketRef.current?.emit('end_call', { to: CALLEE_ID, from: MY_USER_ID });
+                    cleanupCall();
+                },
+            }}
         />
       </SafeAreaView>
     );
