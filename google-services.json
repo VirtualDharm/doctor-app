@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "145366714570",
+    "project_id": "doctorapp-37156",
+    "storage_bucket": "doctorapp-37156.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:145366714570:android:35a590b6e9f50114d00c33",
+        "android_client_info": {
+          "package_name": "com.virtualdharm.testappb"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjL6ZiEmfnsP94clrRNs_Aby4aoYzz5SQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:145366714570:android:3d02972405c84802d00c33",
+        "android_client_info": {
+          "package_name": "com.virtualdharm1.doctorapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjL6ZiEmfnsP94clrRNs_Aby4aoYzz5SQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -13,7 +13,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.virtualdharm1.doctorapp",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +25,10 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.virtualdharm1.doctorapp"
+      "package": "com.virtualdharm1.doctorapp",
+      "permissions": ["NOTIFICATIONS"],
+      "useNextNotificationsApi": true,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -31,6 +38,16 @@
         "projectId": "78f7e8ed-f3e6-483b-b92c-ec0e698382c8"
       }
     },
-    "owner": "virtualdharm1"
+    "owner": "virtualdharm1",
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ffffff",
+          "sounds": ["./assets/ringtone.mp3"]
+        }
+      ]
+    ]
   }
 }
