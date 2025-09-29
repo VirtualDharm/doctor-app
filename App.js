@@ -1,16 +1,39 @@
 // doctor-app/App.js
 import React, { useEffect, useRef, useState } from 'react';
-import { SafeAreaView, View, Text, Button, StyleSheet } from 'react-native';
+import { View, Text, Button, StyleSheet } from 'react-native';
 import AgoraUIKit from 'agora-rn-uikit';
 import { io } from 'socket.io-client';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Audio } from 'expo-av';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+// ---- Agora / server config ----
 const APP_ID = '60bdf4f5f1b641f583d20d28d7a923d1';
 const SIGNALING_SERVER = 'https://server-w411.onrender.com';
 const MY_USER_ID = 'doctor';
+
+// ---- Linking config (for deep links, optional) ----
+const linking = {
+  prefixes: ['doctorapp://'],
+  config: {
+    screens: {
+      IncomingCall: 'incoming/:channel/:from',
+    },
+  },
+};
+
+// ---- Foreground notification behavior ----
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function App() {
   const socketRef = useRef(null);
@@ -23,6 +46,7 @@ export default function App() {
   const ringingSound = useRef(null);
   const [expoPushToken, setExpoPushToken] = useState('');
 
+  // ---- Setup sockets & push registration ----
   useEffect(() => {
     const socket = io(SIGNALING_SERVER, { transports: ['websocket'] });
     socketRef.current = socket;
@@ -63,7 +87,59 @@ export default function App() {
     };
   }, []);
 
-  // 🔔 Request push permissions + token
+  // ---- Notification listeners (3 layers) ----
+  useEffect(() => {
+    // Foreground notifications
+    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
+      console.log('📩 Notification received (foreground):', notification.request.content.data);
+      appendLog('notification received (foreground)');
+    });
+
+    // Background app tapped
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('👆 Notification tapped (background):', response.notification.request.content.data);
+      appendLog('notification tapped (background), restoring call state');
+
+      const data = response.notification.request.content.data;
+      if (data.type === 'incoming_call') {
+        setIncomingCall({
+          from: data.from,
+          channel: data.channel,
+          patientId: data.patientId,
+          name: data.name,
+          symptoms: data.symptoms,
+        });
+        playRingtone();
+      }
+    });
+
+    // Cold start (killed app tapped)
+    (async () => {
+      const lastResponse = await Notifications.getLastNotificationResponseAsync();
+      if (lastResponse) {
+        console.log('🚀 Cold start from notification:', lastResponse.notification.request.content.data);
+        appendLog('cold start notification, restoring call state');
+        const data = lastResponse.notification.request.content.data;
+        if (data.type === 'incoming_call') {
+          setIncomingCall({
+            from: data.from,
+            channel: data.channel,
+            patientId: data.patientId,
+            name: data.name,
+            symptoms: data.symptoms,
+          });
+          playRingtone();
+        }
+      }
+    })();
+
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
+  }, []);
+
+  // ---- Push registration ----
   async function registerForPushNotificationsAsync() {
     if (!Device.isDevice) {
       console.log('Must use physical device for push notifications');
@@ -84,7 +160,8 @@ export default function App() {
     }
 
     try {
-      const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+      const projectId =
+        Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
       const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
       return token;
     } catch (err) {
@@ -93,6 +170,7 @@ export default function App() {
     }
   }
 
+  // ---- Sound helpers ----
   async function playRingtone() {
     try {
       if (ringingSound.current) return;
@@ -119,6 +197,7 @@ export default function App() {
     }
   }
 
+  // ---- Call helpers ----
   function appendLog(s) {
     setLog((l) => `${l}\n${s}`);
   }
@@ -171,6 +250,7 @@ export default function App() {
     setIncomingCall(null);
   }
 
+  // ---- Render ----
   if (joined) {
     return (
       <SafeAreaView style={{ flex: 1 }}>
@@ -190,30 +270,34 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, padding: 20 }}>
-      <Text style={styles.title}>Doctor — Awaiting calls</Text>
+    <NavigationContainer linking={linking}>
+      <SafeAreaView style={{ flex: 1, padding: 20 }}>
+        <Text style={styles.title}>Doctor — Awaiting calls</Text>
 
-      {incomingCall ? (
-        <View style={{ marginTop: 20 }}>
-          <Text style={{ fontWeight: '700' }}>Incoming call from {incomingCall.from}</Text>
-          <View style={{ flexDirection: 'row', marginTop: 12 }}>
-            <Button title="Accept" onPress={acceptCall} />
-            <View style={{ width: 12 }} />
-            <Button title="Reject" onPress={rejectCall} />
+        {incomingCall ? (
+          <View style={{ marginTop: 20 }}>
+            <Text style={{ fontWeight: '700' }}>Incoming call from {incomingCall.from}</Text>
+            <Text style={{ marginTop: 8 }}>Patient: {incomingCall.name}</Text>
+            <Text>Symptoms: {incomingCall.symptoms}</Text>
+            <View style={{ flexDirection: 'row', marginTop: 12 }}>
+              <Button title="Accept" onPress={acceptCall} />
+              <View style={{ width: 12 }} />
+              <Button title="Reject" onPress={rejectCall} />
+            </View>
           </View>
-        </View>
-      ) : (
-        <Text style={{ marginTop: 12, color: '#666' }}>Waiting for patient calls...</Text>
-      )}
+        ) : (
+          <Text style={{ marginTop: 12, color: '#666' }}>Waiting for patient calls...</Text>
+        )}
 
-      <View style={{ marginTop: 18 }}>
-        <Text style={{ fontWeight: '700' }}>Debug</Text>
-        <Text>{`channel: ${channel}`}</Text>
-        <Text>{`uid: ${uid}`}</Text>
-        <Text>{`expoPushToken: ${expoPushToken}`}</Text>
-        <Text style={{ marginTop: 8, color: '#444' }}>{log}</Text>
-      </View>
-    </SafeAreaView>
+        <View style={{ marginTop: 18 }}>
+          <Text style={{ fontWeight: '700' }}>Debug</Text>
+          <Text>{`channel: ${channel}`}</Text>
+          <Text>{`uid: ${uid}`}</Text>
+          <Text>{`expoPushToken: ${expoPushToken}`}</Text>
+          <Text style={{ marginTop: 8, color: '#444' }}>{log}</Text>
+        </View>
+      </SafeAreaView>
+    </NavigationContainer>
   );
 }
 
